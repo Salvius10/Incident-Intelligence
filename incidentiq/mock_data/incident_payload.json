@@ -1,0 +1,33 @@
+{
+  "alert": {
+    "service": "checkout-service",
+    "error_rate": 0.94,
+    "active_users": 12400,
+    "timestamp": "2026-06-14T03:47:00Z",
+    "region": ["us-east", "eu-west"],
+    "revenue_per_minute": 8200
+  },
+  "logs": [
+    "ERROR: Connection timeout — payments-db replica",
+    "WARN: Connection pool exhausted (pool_size=20, waiting=847)",
+    "ERROR: Transaction rollback — deadlock detected",
+    "ERROR: Request queue depth critical (depth=847)",
+    "WARN: Retry attempts exceeded for transaction ID tx-9921"
+  ],
+  "deploy_history": [
+    {
+      "id": "deploy-4821",
+      "time": "2026-06-14T03:31:00Z",
+      "author": "backend-team",
+      "change": "DB_POOL_SIZE changed from 50 to 20",
+      "service": "checkout-service"
+    },
+    {
+      "id": "deploy-4820",
+      "time": "2026-06-13T18:00:00Z",
+      "author": "infra-team",
+      "change": "Updated nginx config",
+      "service": "api-gateway"
+    }
+  ]
+}
