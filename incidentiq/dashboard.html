@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IncidentIQ — Multi-Agent Incident Response</title>
+  <style>
+    :root {
+      --primary:      #1a00d9;
+      --primary-dark: #1300a8;
+      --accent-blue:  #5e9eff;
+      --bg:           #dbeaff;
+      --orange:       #fe6e06;
+      --p1:           #dc2626;
+      --p2:           #fe6e06;
+      --p3:           #d97706;
+      --surface:      #ffffff;
+      --text:         #0f172a;
+      --muted:        #64748b;
+      --border:       #e2e8f0;
+      --radius:       10px;
+      --shadow:       0 2px 14px rgba(26,0,217,0.09);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ──────────────────────────────────────────── */
+    header {
+      background: var(--primary);
+      color: white;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    }
+    .hdr-left h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.3px; }
+    .hdr-left p  { font-size: 0.78rem; opacity: 0.7; margin-top: 2px; }
+    .hdr-right   { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.78rem; opacity: 0.9;
+    }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #6b7280; transition: background 0.3s;
+    }
+    .dot.green { background: #22c55e; }
+    .dot.red   { background: #ef4444; }
+
+    #triggerBtn {
+      background: var(--orange);
+      color: white; border: none;
+      padding: 10px 20px; border-radius: 6px;
+      font-size: 0.88rem; font-weight: 700;
+      cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+    #triggerBtn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+    #triggerBtn:disabled              { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── LOADING BAR ─────────────────────────────────────── */
+    #loadBar {
+      height: 3px; background: var(--accent-blue);
+      width: 0%; transition: width 0.3s, background 0.3s;
+    }
+    #loadBar.pulse {
+      animation: barPulse 2.5s ease-in-out infinite;
+    }
+    #loadBar.done { width: 100% !important; background: #22c55e; animation: none; }
+    @keyframes barPulse {
+      0%   { width: 0%; }
+      50%  { width: 75%; }
+      100% { width: 88%; }
+    }
+
+    /* ── ERROR BANNER ────────────────────────────────────── */
+    #errBanner {
+      display: none;
+      background: #fef2f2; border-bottom: 1px solid #fca5a5;
+      color: #b91c1c; padding: 10px 32px; font-size: 0.82rem;
+    }
+    #errBanner.on { display: block; }
+
+    /* ── MAIN ────────────────────────────────────────────── */
+    main {
+      padding: 28px 32px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    /* ── 2×2 GRID ────────────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+
+    /* ── PANEL ───────────────────────────────────────────── */
+    .panel {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      border: 2px solid transparent;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.55s ease, transform 0.55s ease, border-color 0.3s;
+    }
+    .panel.show      { opacity: 1; transform: translateY(0); }
+    .panel.escalated { border-color: var(--p1); }
+
+    .panel-hdr {
+      padding: 13px 18px;
+      background: linear-gradient(135deg, var(--primary) 0%, #3b28f0 100%);
+      color: white; font-size: 0.88rem; font-weight: 700;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .panel-body { padding: 18px; }
+
+    .placeholder {
+      color: var(--muted); font-size: 0.83rem; font-style: italic;
+    }
+
+    /* ── FIELD ───────────────────────────────────────────── */
+    .field { margin-bottom: 14px; }
+    .flabel {
+      font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.6px;
+      color: var(--muted); margin-bottom: 4px;
+    }
+    .fval { font-size: 0.88rem; line-height: 1.55; }
+
+    /* ── SEVERITY BADGE ──────────────────────────────────── */
+    .sev {
+      display: inline-block;
+      padding: 4px 16px; border-radius: 4px;
+      font-size: 1.05rem; font-weight: 800;
+      letter-spacing: 1.5px; color: white;
+    }
+    .sev-P1 { background: var(--p1); }
+    .sev-P2 { background: var(--p2); }
+    .sev-P3 { background: var(--p3); }
+
+    /* ── CONFIDENCE BAR ──────────────────────────────────── */
+    .conf-row   { display: flex; align-items: center; gap: 10px; }
+    .conf-track { flex: 1; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+    .conf-fill  {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--accent-blue), var(--primary));
+      transition: width 1s ease;
+    }
+    .conf-pct { font-weight: 800; font-size: 0.88rem; color: var(--primary); min-width: 38px; text-align: right; }
+
+    /* ── ESCALATION BOX ──────────────────────────────────── */
+    .esc-box {
+      display: none;
+      background: #fef2f2; border: 1px solid #fca5a5;
+      border-radius: 6px; padding: 10px 14px; margin-bottom: 14px;
+    }
+    .esc-box.on { display: block; }
+    .esc-box strong { color: var(--p1); font-size: 0.82rem; }
+    .esc-box p { color: #7f1d1d; font-size: 0.8rem; margin-top: 4px; }
+
+    /* ── CULPRIT PILL ────────────────────────────────────── */
+    .culprit-pill {
+      display: inline-block;
+      background: #fef3c7; border: 1px solid #fbbf24;
+      color: #92400e; border-radius: 4px;
+      padding: 2px 10px; font-size: 0.75rem; font-weight: 700;
+    }
+
+    /* ── SLACK BUBBLE ────────────────────────────────────── */
+    .slack-wrap { margin-bottom: 14px; }
+    .slack-bubble {
+      background: #1a1d21; color: #d1d2d3;
+      border-radius: 8px; padding: 14px 16px;
+      font-size: 0.82rem; line-height: 1.6;
+    }
+    .slack-label {
+      color: #808387; font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+
+    /* ── STATUS BANNER ───────────────────────────────────── */
+    .status-banner {
+      background: #f0fdf4; border: 1px solid #86efac;
+      border-radius: 8px; padding: 14px 16px;
+      font-size: 0.84rem; line-height: 1.6; color: #166534;
+    }
+    .status-banner-label {
+      font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 8px; color: #15803d;
+    }
+
+    /* ── POSTMORTEM ──────────────────────────────────────── */
+    .pm-summary {
+      font-size: 0.86rem; line-height: 1.7;
+      color: var(--text); margin-bottom: 18px;
+    }
+    .view-btn {
+      display: inline-block;
+      background: var(--primary); color: white;
+      padding: 9px 18px; border-radius: 6px;
+      font-size: 0.82rem; font-weight: 700;
+      text-decoration: none; transition: opacity 0.2s;
+    }
+    .view-btn:hover { opacity: 0.82; }
+
+    /* ── COORDINATION FEED ───────────────────────────────── */
+    #feedSection { margin-top: 28px; display: none; }
+    .feed-title {
+      font-size: 0.72rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      color: var(--primary); margin-bottom: 14px;
+    }
+    .feed-track {
+      display: flex; align-items: center;
+      gap: 0; overflow-x: auto; padding-bottom: 4px;
+    }
+    .feed-badge {
+      background: var(--primary); color: white;
+      border-radius: 7px; padding: 9px 16px;
+      font-size: 0.73rem; white-space: nowrap;
+      opacity: 0; transform: scale(0.82);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      flex-shrink: 0;
+    }
+    .feed-badge.show    { opacity: 1; transform: scale(1); }
+    .feed-badge .b-name { font-weight: 700; }
+    .feed-badge .b-ts   { opacity: 0.7; font-size: 0.66rem; margin-top: 2px; }
+
+    .feed-arrow {
+      color: var(--accent-blue); padding: 0 8px;
+      font-size: 1.1rem; flex-shrink: 0;
+      opacity: 0; transition: opacity 0.35s ease;
+    }
+    .feed-arrow.show { opacity: 1; }
+
+    /* ── SCENARIO BAR ────────────────────────────────────── */
+    .scenario-bar {
+      background: var(--primary-dark);
+      padding: 10px 32px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .scenario-label {
+      color: rgba(255,255,255,0.6);
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-right: 4px;
+      white-space: nowrap;
+    }
+    .s-btn {
+      background: transparent;
+      color: rgba(255,255,255,0.75);
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 6px 14px;
+      border-radius: 5px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s, border-color 0.18s;
+      white-space: nowrap;
+    }
+    .s-btn:hover  { background: rgba(255,255,255,0.12); color: white; border-color: rgba(255,255,255,0.5); }
+    .s-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ─────────────────────────────────────────── -->
+<header>
+  <div class="hdr-left">
+    <h1>⚡ IncidentIQ — Multi-Agent Incident Response</h1>
+    <p>4 agents coordinating through a shared context layer</p>
+  </div>
+  <div class="hdr-right">
+    <div class="status-pill">
+      <div class="dot" id="sDot"></div>
+      <span id="sTxt">Checking backend…</span>
+    </div>
+    <button id="triggerBtn" onclick="triggerIncident()">🔴 Trigger Incident</button>
+  </div>
+</header>
+
+<div class="scenario-bar">
+  <span class="scenario-label">Scenario:</span>
+  <button class="s-btn active" id="sb1" onclick="selectScenario('s1')">🔴 S1: DB Pool Exhaustion</button>
+  <button class="s-btn"        id="sb2" onclick="selectScenario('s2')">🟡 S2: Memory Leak</button>
+  <button class="s-btn"        id="sb3" onclick="selectScenario('s3')">🟠 S3: Third-Party Outage</button>
+</div>
+
+<div id="loadBar"></div>
+<div id="errBanner"></div>
+
+<!-- ── MAIN ───────────────────────────────────────────── -->
+<main>
+  <div class="grid">
+
+    <!-- Panel 1 · Triage -->
+    <div class="panel" id="pTriage">
+      <div class="panel-hdr">🔍 Triage Agent</div>
+      <div class="panel-body"><p class="placeholder">Waiting for incident trigger…</p></div>
+    </div>
+
+    <!-- Panel 2 · Diagnosis -->
+    <div class="panel" id="pDiagnosis">
+      <div class="panel-hdr">🩺 Diagnosis Agent</div>
+      <div class="panel-body"><p class="placeholder">Waiting for triage output…</p></div>
+    </div>
+
+    <!-- Panel 3 · Comms -->
+    <div class="panel" id="pComms">
+      <div class="panel-hdr">📢 Comms Agent</div>
+      <div class="panel-body"><p class="placeholder">Waiting for diagnosis output…</p></div>
+    </div>
+
+    <!-- Panel 4 · Postmortem -->
+    <div class="panel" id="pPostmortem">
+      <div class="panel-hdr">📄 Postmortem Agent</div>
+      <div class="panel-body"><p class="placeholder">Waiting for comms output…</p></div>
+    </div>
+
+  </div>
+
+  <!-- Coordination Feed -->
+  <div id="feedSection">
+    <div class="feed-title">⚡ Coordination Feed — Agent Handoff Timeline</div>
+    <div class="feed-track" id="feedTrack"></div>
+  </div>
+</main>
+
+<script>
+/* ── CONFIG ─────────────────────────────────────────────── */
+const API = 'http://127.0.0.1:8000';
+
+const SCENARIOS = {
+  s1: {
+    alert: { service: 'checkout-service', error_rate: 0.94, active_users: 12400, timestamp: '2026-06-14T03:47:00Z', region: ['us-east', 'eu-west'], revenue_per_minute: 8200 },
+    logs: [
+      'ERROR: Connection timeout — payments-db replica',
+      'WARN: Connection pool exhausted (pool_size=20, waiting=847)',
+      'ERROR: Transaction rollback — deadlock detected',
+      'ERROR: Request queue depth critical (depth=847)',
+      'WARN: Retry attempts exceeded for transaction ID tx-9921'
+    ],
+    deploy_history: [
+      { id: 'deploy-4821', time: '2026-06-14T03:31:00Z', author: 'backend-team', change: 'DB_POOL_SIZE changed from 50 to 20', service: 'checkout-service' },
+      { id: 'deploy-4820', time: '2026-06-13T18:00:00Z', author: 'infra-team',   change: 'Updated nginx config',              service: 'api-gateway'       }
+    ]
+  },
+  s2: {
+    alert: { service: 'recommendation-service', error_rate: 0.41, active_users: 28000, timestamp: '2026-06-14T09:15:00Z', region: ['us-west', 'ap-south'], revenue_per_minute: 1200 },
+    logs: [
+      'WARN: Memory usage at 89% (container limit: 2Gi)',
+      'WARN: GC pause duration increasing — last pause 4.2s',
+      'ERROR: OutOfMemoryError in recommendation-worker pod-7f3a',
+      'WARN: Pod restart triggered by liveness probe failure',
+      'WARN: Memory usage at 91% (container limit: 2Gi) — pod-7f3a-2',
+      'ERROR: Request latency p99 exceeded 8000ms'
+    ],
+    deploy_history: [
+      { id: 'deploy-4798', time: '2026-06-13T14:00:00Z', author: 'ml-team',    change: 'Added new embedding cache layer to recommendation-service', service: 'recommendation-service' },
+      { id: 'deploy-4790', time: '2026-06-11T10:00:00Z', author: 'infra-team', change: 'Increased pod replica count from 4 to 6',                   service: 'recommendation-service' }
+    ]
+  },
+  s3: {
+    alert: { service: 'payment-gateway-adapter', error_rate: 0.78, active_users: 9100, timestamp: '2026-06-14T20:03:00Z', region: ['eu-west'], revenue_per_minute: 5400 },
+    logs: [
+      'ERROR: Upstream timeout — provider api.stripeproxy-partner.com (timeout 30s)',
+      'ERROR: Upstream timeout — provider api.stripeproxy-partner.com (timeout 30s)',
+      'WARN: Circuit breaker OPEN for payment-gateway-adapter -> stripeproxy-partner',
+      'ERROR: Fallback provider not configured for region eu-west',
+      'ERROR: 502 Bad Gateway returned to 1,847 client requests in last 60s'
+    ],
+    deploy_history: [
+      { id: 'deploy-4815', time: '2026-06-12T11:00:00Z', author: 'payments-team', change: 'Updated retry logic for payment-gateway-adapter', service: 'payment-gateway-adapter' }
+    ]
+  }
+};
+
+let activePayload = SCENARIOS.s1;
+
+function selectScenario(key) {
+  activePayload = SCENARIOS[key];
+  ['s1','s2','s3'].forEach(k => document.getElementById('sb' + k.slice(1)).classList.toggle('active', k === key));
+}
+
+/* ── HELPERS ────────────────────────────────────────────── */
+function fmtTs(iso) {
+  try { return iso.split('T')[1].slice(0, 8) + 'Z'; } catch { return iso; }
+}
+function sevClass(s) { return 'sev sev-' + (s || 'P3'); }
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── HEALTH CHECK ───────────────────────────────────────── */
+async function checkHealth() {
+  const dot = document.getElementById('sDot');
+  const txt = document.getElementById('sTxt');
+  try {
+    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) { dot.className = 'dot green'; txt.textContent = '🟢 Backend connected'; return; }
+  } catch {}
+  dot.className = 'dot red'; txt.textContent = '🔴 Backend unreachable';
+}
+
+/* ── LOADING STATE ──────────────────────────────────────── */
+function setLoading(on) {
+  const bar = document.getElementById('loadBar');
+  const btn = document.getElementById('triggerBtn');
+  if (on) {
+    bar.className = 'pulse'; btn.disabled = true; btn.textContent = 'Running pipeline…';
+  } else {
+    bar.className = 'done'; btn.disabled = false; btn.textContent = '🔴 Trigger Incident';
+    setTimeout(() => { bar.className = ''; bar.style.width = '0%'; }, 900);
+  }
+}
+
+function showErr(msg) { const b = document.getElementById('errBanner'); b.textContent = msg; b.className = 'on'; }
+function clearErr()   { document.getElementById('errBanner').className = ''; }
+
+/* ── POPULATE PANELS ────────────────────────────────────── */
+function fillTriage(t) {
+  document.getElementById('pTriage').querySelector('.panel-body').innerHTML = `
+    <div class="field">
+      <div class="flabel">Severity</div>
+      <span class="${sevClass(t.severity)}">${esc(t.severity || '—')}</span>
+    </div>
+    <div class="field">
+      <div class="flabel">Affected Systems</div>
+      <div class="fval">${esc((t.affected_systems || []).join(', '))}</div>
+    </div>
+    <div class="field">
+      <div class="flabel">Regions</div>
+      <div class="fval">${esc((t.regions || []).join(', '))}</div>
+    </div>
+    <div class="field">
+      <div class="flabel">Users Impacted</div>
+      <div class="fval">${Number(t.users_impacted || 0).toLocaleString()}</div>
+    </div>
+    <div class="field">
+      <div class="flabel">Business Impact</div>
+      <div class="fval">${esc(t.business_impact || '—')}</div>
+    </div>
+    <div class="field">
+      <div class="flabel">Incident Start</div>
+      <div class="fval">${esc(t.incident_start || '—')}</div>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <div class="flabel">Summary</div>
+      <div class="fval">${esc(t.summary || '—')}</div>
+    </div>`;
+}
+
+function fillDiagnosis(d, escalation) {
+  const panel = document.getElementById('pDiagnosis');
+  const escalated = escalation && escalation.triggered;
+  if (escalated) panel.classList.add('escalated');
+  const culprit = d.culprit || {};
+  const conf = d.confidence || 0;
+  panel.querySelector('.panel-body').innerHTML = `
+    <div class="esc-box${escalated ? ' on' : ''}">
+      <strong>⚠️ HUMAN ESCALATION TRIGGERED</strong>
+      <p>${esc(escalation && escalation.reason || 'Root cause could not be determined with sufficient confidence.')}</p>
+    </div>
+    <div class="field">
+      <div class="flabel">Root Cause Hypothesis</div>
+      <div class="fval">${esc(d.root_cause_hypothesis || '—')}</div>
+    </div>
+    <div class="field">
+      <div class="flabel">Confidence</div>
+      <div class="conf-row">
+        <div class="conf-track"><div class="conf-fill" style="width:${conf}%"></div></div>
+        <div class="conf-pct">${conf}%</div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="flabel">Culprit</div>
+      <span class="culprit-pill">${esc(culprit.deploy_id || '—')}</span>
+      <div class="fval" style="margin-top:6px">${esc(culprit.detail || '—')}</div>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <div class="flabel">Fix Direction</div>
+      <div class="fval">${esc(d.fix_direction || '—')}</div>
+    </div>`;
+}
+
+function fillComms(c) {
+  document.getElementById('pComms').querySelector('.panel-body').innerHTML = `
+    <div class="slack-wrap">
+      <div class="slack-bubble">
+        <div class="slack-label"># eng-incidents</div>
+        ${esc(c.internal_slack_message || '—')}
+      </div>
+    </div>
+    <div class="status-banner">
+      <div class="status-banner-label">🌐 Status Page Update</div>
+      ${esc(c.status_page_update || '—')}
+    </div>`;
+}
+
+function fillPostmortem(summary) {
+  document.getElementById('pPostmortem').querySelector('.panel-body').innerHTML = `
+    <div class="flabel" style="margin-bottom:8px">RCA Summary</div>
+    <div class="pm-summary">${esc(summary || '—')}</div>
+    <a class="view-btn" href="${API}/postmortem" target="_blank">📄 View Full Report</a>`;
+}
+
+/* ── COORDINATION FEED ──────────────────────────────────── */
+function renderFeed(feed) {
+  const section = document.getElementById('feedSection');
+  const track   = document.getElementById('feedTrack');
+  section.style.display = 'block';
+  track.innerHTML = '';
+
+  feed.forEach((entry, i) => {
+    const badge = document.createElement('div');
+    badge.className = 'feed-badge';
+    badge.innerHTML = `<div class="b-name">${esc(entry.agent)}</div><div class="b-ts">${fmtTs(entry.timestamp)}</div>`;
+    track.appendChild(badge);
+
+    if (i < feed.length - 1) {
+      const arrow = document.createElement('div');
+      arrow.className = 'feed-arrow';
+      arrow.textContent = '→';
+      track.appendChild(arrow);
+    }
+
+    // staggered reveal after panels finish
+    const delay = 3000 + i * 260;
+    setTimeout(() => badge.classList.add('show'), delay);
+    if (i < feed.length - 1) {
+      setTimeout(() => {
+        track.querySelectorAll('.feed-arrow')[i]?.classList.add('show');
+      }, delay + 220);
+    }
+  });
+}
+
+/* ── TRIGGER ────────────────────────────────────────────── */
+async function triggerIncident() {
+  clearErr();
+  setLoading(true);
+
+  // reset panels
+  ['pTriage','pDiagnosis','pComms','pPostmortem'].forEach(id => {
+    const p = document.getElementById(id);
+    p.classList.remove('show','escalated');
+    p.querySelector('.panel-body').innerHTML = '<p class="placeholder">Processing…</p>';
+  });
+  document.getElementById('feedSection').style.display = 'none';
+
+  let data;
+  try {
+    const resp = await fetch(`${API}/trigger-incident`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(activePayload),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(`Server returned ${resp.status}: ${txt.slice(0,200)}`);
+    }
+    data = await resp.json();
+  } catch (err) {
+    showErr(`Could not reach IncidentIQ backend. Make sure the server is running (uvicorn app:app --reload). Detail: ${err.message}`);
+    setLoading(false);
+    ['pTriage','pDiagnosis','pComms','pPostmortem'].forEach(id =>
+      document.getElementById(id).querySelector('.panel-body').innerHTML = '<p class="placeholder">—</p>'
+    );
+    return;
+  }
+
+  setLoading(false);
+
+  // populate (hidden)
+  fillTriage(data.triage || {});
+  fillDiagnosis(data.diagnosis || {}, data.escalation);
+  fillComms(data.comms || {});
+  fillPostmortem(data.postmortem_summary || '');
+
+  // sequential reveal — 700 ms apart
+  ['pTriage','pDiagnosis','pComms','pPostmortem'].forEach((id, i) => {
+    setTimeout(() => document.getElementById(id).classList.add('show'), i * 700);
+  });
+
+  // feed after last panel
+  renderFeed(data.band_feed || []);
+}
+
+/* ── INIT ───────────────────────────────────────────────── */
+checkHealth();
+</script>
+</body>
+</html>

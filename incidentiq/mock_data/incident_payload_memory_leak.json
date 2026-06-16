@@ -1,0 +1,34 @@
+{
+  "alert": {
+    "service": "recommendation-service",
+    "error_rate": 0.41,
+    "active_users": 28000,
+    "timestamp": "2026-06-14T09:15:00Z",
+    "region": ["us-west", "ap-south"],
+    "revenue_per_minute": 1200
+  },
+  "logs": [
+    "WARN: Memory usage at 89% (container limit: 2Gi)",
+    "WARN: GC pause duration increasing — last pause 4.2s",
+    "ERROR: OutOfMemoryError in recommendation-worker pod-7f3a",
+    "WARN: Pod restart triggered by liveness probe failure",
+    "WARN: Memory usage at 91% (container limit: 2Gi) — pod-7f3a-2",
+    "ERROR: Request latency p99 exceeded 8000ms"
+  ],
+  "deploy_history": [
+    {
+      "id": "deploy-4798",
+      "time": "2026-06-13T14:00:00Z",
+      "author": "ml-team",
+      "change": "Added new embedding cache layer to recommendation-service",
+      "service": "recommendation-service"
+    },
+    {
+      "id": "deploy-4790",
+      "time": "2026-06-11T10:00:00Z",
+      "author": "infra-team",
+      "change": "Increased pod replica count from 4 to 6",
+      "service": "recommendation-service"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "alert": {
+    "service": "payment-gateway-adapter",
+    "error_rate": 0.78,
+    "active_users": 9100,
+    "timestamp": "2026-06-14T20:03:00Z",
+    "region": ["eu-west"],
+    "revenue_per_minute": 5400
+  },
+  "logs": [
+    "ERROR: Upstream timeout — provider api.stripeproxy-partner.com (timeout 30s)",
+    "ERROR: Upstream timeout — provider api.stripeproxy-partner.com (timeout 30s)",
+    "WARN: Circuit breaker OPEN for payment-gateway-adapter -> stripeproxy-partner",
+    "ERROR: Fallback provider not configured for region eu-west",
+    "ERROR: 502 Bad Gateway returned to 1,847 client requests in last 60s"
+  ],
+  "deploy_history": [
+    {
+      "id": "deploy-4815",
+      "time": "2026-06-12T11:00:00Z",
+      "author": "payments-team",
+      "change": "Updated retry logic for payment-gateway-adapter",
+      "service": "payment-gateway-adapter"
+    }
+  ]
+}
