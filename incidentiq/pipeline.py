@@ -4,7 +4,7 @@ Runs the 4-agent sequence through the Band coordination layer.
 Importable by both main.py (CLI) and app.py (FastAPI) with no side effects.
 """
 
-from band.band_client import reset_band_history, post_to_band, read_band_history
+from coordination.band_client import reset_band_history, post_to_band, read_band_history
 from agents.triage_agent import run_triage_agent
 from agents.diagnosis_agent import run_diagnosis_agent
 from agents.comms_agent import run_comms_agent

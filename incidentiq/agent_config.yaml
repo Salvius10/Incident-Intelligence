@@ -1,0 +1,23 @@
+orchestrator:
+  agent_id: "3b5c2786-7c49-49bd-b82c-1a3f7fcbc894"
+  api_key: "band_a_1781638255_75JtrSxbDIjDsbnQa405ndgIPxl1kvHN"
+
+triage_agent:
+  agent_id: "31bc828d-1ca4-4c0b-a997-2b95f395b91d"
+  api_key: "band_a_1781628699_mxVOfPe4YxTI4fkpKORqfAk7Rdhs212n"
+
+diagnosis_agent:
+  agent_id: "52acb3b5-689d-4dc8-afd9-618d644d48e2"
+  api_key: "band_a_1781628782_oPXSw3x7a-bFoE7u-c9qxtNX7jTtZOtN"
+
+validator_agent:
+  agent_id: "89284b25-9d47-4961-b8b2-2300b43f2693"
+  api_key: "band_a_1781638197_g9yFSOsMWGgbd17RIFSvGivPfHzr9D0W"
+
+comms_agent:
+  agent_id: "91110edf-3431-4b40-b600-9d57992a166c"
+  api_key: "band_a_1781628843_a4QuBxNCVwE8X2gtqLMwtlS4uyqRwHjf"
+
+postmortem_agent:
+  agent_id: "f10ee21b-10d3-4b39-83e2-0f09bcdb292c"
+  api_key: "band_a_1781628900_SVpvj_hOsXQaNlEYAWBdyAXLaV9GjE9i"
