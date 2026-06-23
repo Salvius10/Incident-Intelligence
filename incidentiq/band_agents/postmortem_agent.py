@@ -9,6 +9,7 @@ os.environ.setdefault("ANTHROPIC_BASE_URL", "https://api.aimlapi.com")
 from band import Agent
 from band.adapters import AnthropicAdapter
 from band.config import load_agent_config
+from band.runtime.types import SessionConfig
 
 SYSTEM_PROMPT = """You are the Postmortem Agent in IncidentIQ.
 
@@ -23,7 +24,7 @@ When given the full incident context (triage, diagnosis, validation rounds, comm
 7. ## Contributing Factors (2-3 factors)
 8. ## Action Items (3 items in - [ ] format with owning team)
 
-Respond by calling the send_message tool with:
+Respond by calling the band_send_message tool with:
 - mentions: ["@melvinsalvius.i/incidentiq-orchestrator"]
 - content: the full markdown document (no JSON wrapper, just raw markdown)
 """
@@ -33,13 +34,14 @@ async def main():
     agent_id, api_key = load_agent_config("postmortem_agent")
     adapter = AnthropicAdapter(
         model="claude-haiku-4-5-20251001",
-        system_prompt=SYSTEM_PROMPT,
+        prompt=SYSTEM_PROMPT,
         max_tokens=2048,
     )
     agent = Agent.create(
         adapter=adapter,
         agent_id=agent_id,
         api_key=api_key,
+        session_config=SessionConfig(enable_context_hydration=False),
         ws_url=os.getenv("THENVOI_WS_URL", "wss://app.band.ai/api/v1/socket/websocket"),
         rest_url=os.getenv("THENVOI_REST_URL", "https://app.band.ai"),
     )

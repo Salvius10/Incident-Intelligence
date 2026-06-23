@@ -12,6 +12,7 @@ Does NOT run as a Band WebSocket agent — it is a sequential REST driver.
 import json
 import os
 import re
+import sys
 import time
 from datetime import datetime, timezone
 
@@ -22,15 +23,32 @@ from band.config import load_agent_config
 
 load_dotenv()
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 BAND_ROOM_ID = os.getenv("BAND_ROOM_ID", "")
 REST_URL = os.getenv("THENVOI_REST_URL", "https://app.band.ai")
 
+
+def _agent_id(config_key: str, env_key: str) -> str:
+    agent_id = os.getenv(env_key, "")
+    if agent_id:
+        return agent_id
+    try:
+        agent_id, _ = load_agent_config(config_key)
+        return agent_id
+    except Exception:
+        return ""
+
+
 AGENTS = {
-    "triage":     ("melvinsalvius.i/incidentiq-triage-agent",   os.getenv("BAND_TRIAGE_AGENT_ID", "")),
-    "diagnosis":  ("melvinsalvius.i/incidentiq-diagnosis-age",  os.getenv("BAND_DIAGNOSIS_AGENT_ID", "")),
-    "validator":  ("melvinsalvius.i/incidentiq-validator-age",  os.getenv("BAND_VALIDATOR_AGENT_ID", "")),
-    "comms":      ("melvinsalvius.i/incidentiq-comms-agent",    os.getenv("BAND_COMMS_AGENT_ID", "")),
-    "postmortem": ("melvinsalvius.i/incidentiq-postmortem-ag",  os.getenv("BAND_POSTMORTEM_AGENT_ID", "")),
+    "triage":     ("melvinsalvius.i/incidentiq-triage-agent",  _agent_id("triage_agent", "BAND_TRIAGE_AGENT_ID")),
+    "diagnosis":  ("melvinsalvius.i/incidentiq-diagnosis-age", _agent_id("diagnosis_agent", "BAND_DIAGNOSIS_AGENT_ID")),
+    "validator":  ("melvinsalvius.i/incidentiq-validator-age", _agent_id("validator_agent", "BAND_VALIDATOR_AGENT_ID")),
+    "comms":      ("melvinsalvius.i/incidentiq-comms-agent",   _agent_id("comms_agent", "BAND_COMMS_AGENT_ID")),
+    "postmortem": ("melvinsalvius.i/incidentiq-postmortem-ag", _agent_id("postmortem_agent", "BAND_POSTMORTEM_AGENT_ID")),
 }
 
 
@@ -154,13 +172,25 @@ def _poll(client: RestClient, sender_id: str, after: datetime, timeout: int = 12
     """Poll orchestrator inbox until a message from sender_id arrives after `after`."""
     deadline = time.time() + timeout
     while time.time() < deadline:
-        resp = client.agent_api_messages.list_agent_messages(BAND_ROOM_ID, status="all")
-        for msg in resp.data:
-            ts = msg.inserted_at
-            if ts and ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
-            if msg.sender_id == sender_id and ts and ts > after:
-                return msg.content
+        page = 1
+        while True:
+            resp = client.agent_api_messages.list_agent_messages(
+                BAND_ROOM_ID,
+                status="all",
+                page=page,
+                page_size=100,
+            )
+            for msg in resp.data:
+                ts = msg.inserted_at
+                if ts and ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                if msg.sender_id == sender_id and ts and ts > after:
+                    return msg.content
+
+            metadata = getattr(resp, "metadata", None)
+            if not metadata or not getattr(metadata, "has_more", False):
+                break
+            page += 1
         time.sleep(3)
     return None
 

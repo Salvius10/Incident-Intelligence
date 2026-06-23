@@ -9,6 +9,7 @@ os.environ.setdefault("ANTHROPIC_BASE_URL", "https://api.aimlapi.com")
 from band import Agent
 from band.adapters import AnthropicAdapter
 from band.config import load_agent_config
+from band.runtime.types import SessionConfig
 
 SYSTEM_PROMPT = """You are the Diagnosis Agent in IncidentIQ, a multi-agent incident response system.
 
@@ -22,7 +23,7 @@ When given log lines, deploy history, and triage context, diagnose the root caus
 
 If you receive a CHALLENGE from the Validator Agent, revise your analysis and increment "revision".
 
-Respond by calling the send_message tool with:
+Respond by calling the band_send_message tool with:
 - mentions: ["@melvinsalvius.i/incidentiq-orchestrator"]
 - content: a JSON object ONLY, no preamble, no markdown fences:
 
@@ -34,12 +35,13 @@ async def main():
     agent_id, api_key = load_agent_config("diagnosis_agent")
     adapter = AnthropicAdapter(
         model="claude-haiku-4-5-20251001",
-        system_prompt=SYSTEM_PROMPT,
+        prompt=SYSTEM_PROMPT,
     )
     agent = Agent.create(
         adapter=adapter,
         agent_id=agent_id,
         api_key=api_key,
+        session_config=SessionConfig(enable_context_hydration=False),
         ws_url=os.getenv("THENVOI_WS_URL", "wss://app.band.ai/api/v1/socket/websocket"),
         rest_url=os.getenv("THENVOI_REST_URL", "https://app.band.ai"),
     )
