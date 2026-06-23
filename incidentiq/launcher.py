@@ -1,5 +1,7 @@
 """
-launcher.py — Starts all 5 listener agents as subprocesses, then runs the Orchestrator.
+launcher.py — Starts all 6 Band agents (5 specialists + orchestrator) as
+subprocesses, then fires a single trigger message to the Orchestrator via Band.
+All inter-agent coordination runs over WebSocket — no REST polling loop.
 
 Usage:
     python launcher.py [scenario]
@@ -26,6 +28,7 @@ AGENT_FILES = [
     "band_agents/validator_agent.py",
     "band_agents/comms_agent.py",
     "band_agents/postmortem_agent.py",
+    "band_agents/orchestrator.py",
 ]
 
 SCENARIOS = {
@@ -35,20 +38,17 @@ SCENARIOS = {
 }
 
 
-def shutdown_processes(processes, show_output=False):
+def shutdown_processes(processes):
     print("\nShutting down agent listeners...")
     for _, p in processes:
         if p.poll() is None:
             p.terminate()
     for name, p in processes:
-        out = ""
         try:
-            out, _ = p.communicate(timeout=5)
+            p.communicate(timeout=5)
         except subprocess.TimeoutExpired:
             p.kill()
-            out, _ = p.communicate()
-        if show_output and out:
-            print(f"\n{name} output:\n{out[:4000]}")
+            p.communicate()
     print("Done.")
 
 
@@ -57,7 +57,7 @@ def main():
     payload_path = SCENARIOS.get(scenario, SCENARIOS["1"])
 
     print(f"IncidentIQ — Scenario {scenario}: {payload_path}")
-    print("Starting 5 listener agents...")
+    print("Starting 6 Band agents (5 specialists + orchestrator)...")
 
     processes = []
     child_env = os.environ.copy()
@@ -76,34 +76,37 @@ def main():
         processes.append((agent_file, p))
         print(f"  Started {agent_file}  (pid {p.pid})")
 
-    results = {}
     try:
-        print("Waiting 8s for agents to connect to Band WebSocket...")
+        print("Waiting 8s for all agents to connect to Band WebSocket...")
         time.sleep(8)
 
         # Check for early crashes
         for name, p in processes:
             if p.poll() is not None:
                 out, _ = p.communicate()
-                print(f"  WARNING: {name} exited early:\n{out[:4000]}")
-
-        print("\nRunning Orchestrator...")
-        from band_agents.orchestrator import run_incident
+                print(f"  WARNING: {name} exited early:\n{out[:2000]}")
 
         with open(BASE_DIR / payload_path) as f:
             payload = json.load(f)
 
-        results = run_incident(payload)
+        from band_agents.orchestrator import send_trigger
+        send_trigger(payload)
 
-        print("\n" + "=" * 60)
-        print("INCIDENT RESPONSE COMPLETE")
-        print("=" * 60)
-        printable = {k: v for k, v in results.items() if k != "postmortem_report"}
-        print(json.dumps(printable, indent=2, ensure_ascii=False))
-        if "postmortem_report" in results:
-            print("\nPostmortem saved to postmortem_output.md")
+        print("\nOrchestrator is driving the incident response through Band WebSocket.")
+        print("Watch the Band room for live updates. Press Ctrl+C to stop agents.\n")
+
+        # Keep agents alive
+        while True:
+            time.sleep(5)
+            for name, p in processes:
+                if p.poll() is not None:
+                    out, _ = p.communicate()
+                    print(f"  Agent {name} exited unexpectedly:\n{out[:1000]}")
+
+    except KeyboardInterrupt:
+        print("\nInterrupted.")
     finally:
-        shutdown_processes(processes, show_output=bool(results.get("error")))
+        shutdown_processes(processes)
 
 
 if __name__ == "__main__":

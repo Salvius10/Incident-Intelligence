@@ -17,13 +17,9 @@ When given confirmed triage and diagnosis context, produce two communications:
 1. Internal Slack message — technical, for engineers/CTO. Include: severity, root cause, confidence %, culprit, fix direction, user impact, revenue impact.
 2. External status page update — plain language, no jargon, no internal details. Acknowledge the issue, reassure customers, state fix is in progress.
 
-IMPORTANT: In your JSON response, use actual newline characters in the
-message strings, not escaped \n sequences. The messages should be
-multi-line readable text.
-
 Respond by calling the band_send_message tool with:
 - mentions: ["@melvinsalvius.i/incidentiq-orchestrator"]
-- content: a JSON object ONLY, no preamble, no markdown fences:
+- content: a JSON object ONLY, no preamble, no markdown fences. Use \\n escape sequences for line breaks within string values (do NOT use literal newlines inside JSON strings):
 
 {"internal_slack_message":"[P1] Checkout service down...\nRoot cause: ...","status_page_update":"We are experiencing issues...\nOur team is working on it."}
 """

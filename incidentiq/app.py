@@ -2,9 +2,9 @@
 app.py — FastAPI server exposing IncidentIQ's pipeline via HTTP.
 Run with: uvicorn app:app --reload
 
-/trigger-incident uses the async Band orchestrator (band_agents/orchestrator.py).
-The 5 listener agents must already be running (start with: python launcher.py).
-Falls back to the synchronous pipeline if the Band orchestrator is unavailable.
+/trigger-incident sends the payload to the Band Orchestrator Agent via a
+single @mention message. All subsequent coordination happens over WebSocket.
+The 6 Band agents must already be running (start with: python launcher.py).
 """
 
 from typing import Any, Dict
@@ -25,11 +25,13 @@ app.add_middleware(
 @app.post("/trigger-incident")
 def trigger_incident(payload: Dict[str, Any] = Body(...)):
     """
-    Triggers the full incident response.
-    Runs via the Band multi-agent orchestrator (requires listener agents running).
+    Sends the incident payload to the Band Orchestrator Agent.
+    All coordination happens over Band WebSocket — no REST polling.
+    Requires all 6 Band agents to be running (python launcher.py).
     """
-    from band_agents.orchestrator import run_incident
-    return run_incident(payload)
+    from band_agents.orchestrator import send_trigger
+    send_trigger(payload)
+    return {"status": "triggered", "message": "Incident sent to Band Orchestrator Agent."}
 
 
 @app.get("/health")
